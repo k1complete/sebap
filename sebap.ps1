@@ -21,27 +21,30 @@ function ConvertFrom-MySecureString {
      return $s
 }
 
-function Set-MyDefaultProxy {
+function Set-WebProxy-Credentials {
     [cmdletbinding()]
     param (
     [Parameter(Mandatory)]
-    [string]$Proxy)
+    [string]$Proxy,
+    [Parameter(Mandatory)]
+    [PSCredential]$cred
+    )
     [net.webrequest]::defaultwebproxy = new-object net.webproxy $Proxy
+    [net.webrequest]::defaultwebproxy.credentials = $cred
     return $Proxy
 }
 
-function Set-Environment-Behind-Authentication-Proxy {
+function Set-Http-Proxy-Environment-Variable {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory)]
-        [string]$Proxy)
-    $cred = Get-Credential -Credential $env:username
-    [net.webrequest]::defaultwebproxy.credentials = $cred
-
+        [string]$Proxy,
+        [Parameter(Mandatory)]
+        [PSCredential]$cred
+        )
     $pwd = ConvertFrom-MySecureString -SecureString $cred.Password -AsPlainText
     $encodedUser = [System.Web.HttpUtility]::UrlEncode($cred.UserName)
     $encodedPwd = [System.Web.HttpUtility]::UrlEncode($pwd)
-
     $ps = 'http://' + $user + $encodedUser + ':' + $encodedPwd + '@' + $Proxy
     #write-host $ps
     $env:http_proxy = $ps
@@ -51,7 +54,17 @@ function Set-Environment-Behind-Authentication-Proxy {
     return $ps
 }
 
-
-Set-MyDefaultProxy $proxy
-Set-Environment-Behind-Authentication-Proxy $proxy
+function Set-Environment-Behind-Authentication-Proxy {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [string]$Proxy,
+        [Parameter(Mandatory)]
+        [PScredential]$cred
+        )
+    Set-WebProxy-Credentials $proxy $cred
+    return Set-Http-Proxy-Environment-Variable $proxy $cred
+}
+$cred = Get-Credential -Credential $env:username
+Set-Environment-Behind-Authentication-Proxy $proxy $cred
 Write-host "このセッションでのプロキシ設定を行いました, [net.webproxy]::defaultwebproxy, http_proxy"
