@@ -36,6 +36,8 @@ function Set-Environment-Behind-Authentication-Proxy {
         [Parameter(Mandatory)]
         [string]$Proxy)
     $cred = Get-Credential -Credential $env:username
+    [net.webrequest]::defaultwebproxy.credentials = $cred
+
     $pwd = ConvertFrom-MySecureString -SecureString $cred.Password -AsPlainText
     $encodedUser = [System.Web.HttpUtility]::UrlEncode($cred.UserName)
     $encodedPwd = [System.Web.HttpUtility]::UrlEncode($pwd)
