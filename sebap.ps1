@@ -42,6 +42,9 @@ function Set-Http-Proxy-Environment-Variable {
         [Parameter(Mandatory)]
         [PSCredential]$cred
         )
+    #import assembly 'System.Web' for HttpUtility
+    $result = Add-Type -AssemblyName System.Web
+    
     $pwd = ConvertFrom-MySecureString -SecureString $cred.Password -AsPlainText
     $encodedUser = [System.Web.HttpUtility]::UrlEncode($cred.UserName)
     $encodedPwd = [System.Web.HttpUtility]::UrlEncode($pwd)
