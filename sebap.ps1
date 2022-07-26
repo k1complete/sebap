@@ -5,7 +5,10 @@ Param (
     [cmdletbinding()]
     [validatePattern("[0-9a-z-_.]+(:\d+)?")]
     [Parameter(Mandatory)]
-    [string]$Proxy)
+    [string]$Proxy,
+    [cmdletbinding()]
+    [validateSet("process", "user", "machine")]
+    [string]$Scope = "process")
 
 function ConvertFrom-MySecureString {
     param(
@@ -40,7 +43,8 @@ function Set-Http-Proxy-Environment-Variable {
         [Parameter(Mandatory)]
         [string]$Proxy,
         [Parameter(Mandatory)]
-        [PSCredential]$cred
+        [PSCredential]$cred,
+        [string]$scope
         )
     #import assembly 'System.Web' for HttpUtility
     $result = Add-Type -AssemblyName System.Web
@@ -50,10 +54,13 @@ function Set-Http-Proxy-Environment-Variable {
     $encodedPwd = [System.Web.HttpUtility]::UrlEncode($pwd)
     $ps = 'http://' + $user + $encodedUser + ':' + $encodedPwd + '@' + $Proxy
     #write-host $ps
-    $env:http_proxy = $ps
-    $env:https_proxy = $ps
-    $env:HTTP_PROXY = $ps
-    $env:HTTPS_PROXY = $ps
+    if ($scope -eq "session") {
+        $env:HTTP_PROXY = $ps
+        $env:HTTPS_PROXY = $ps
+    } else {
+        [Environment]::SetEnvironmentVariable('HTTP_PROXY', $ps, $scope)
+        [Environment]::SetEnvironmentVariable('HTTPS_PROXY', $ps, $scope)
+    }
     return $ps
 }
 
@@ -63,11 +70,22 @@ function Set-Environment-Behind-Authentication-Proxy {
         [Parameter(Mandatory)]
         [string]$Proxy,
         [Parameter(Mandatory)]
-        [PScredential]$cred
+        [PScredential]$cred,
+        [string]$scope
         )
-    Set-WebProxy-Credentials $proxy $cred
-    return Set-Http-Proxy-Environment-Variable $proxy $cred
+    Set-WebProxy-Credentials $proxy $cred 
+    return Set-Http-Proxy-Environment-Variable $proxy $cred $scope
 }
-$cred = Get-Credential -Credential $env:username
-Set-Environment-Behind-Authentication-Proxy $proxy $cred
-Write-host "このセッションでのプロキシ設定を行いました, [net.webproxy]::defaultwebproxy, http_proxy"
+try {
+    $cred = Get-Credential -Credential $env:username
+    Set-Environment-Behind-Authentication-Proxy $proxy $cred $scope
+    $scopename = @{
+     "process" = "process"
+     "user" = "user"
+     "machine" = "machine"
+    }
+    Write-host "この" $scopename.$scope "でのプロキシ設定を行いました, [net.webproxy]::defaultwebproxy, http_proxy"
+} catch {
+  $PSCmdlet.ThrowTerminatingError($PSItem)
+}
+
